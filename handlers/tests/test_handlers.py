@@ -1,24 +1,29 @@
+# coding=utf-8
 import requests
 from django.test import mock, TransactionTestCase
 
-from ..registry import get_handler
+from ..models import RequestLog, RequestLogError
+from ..handlers import get_handler
 
 
-class SmsHandlerBaseTestCase(TransactionTestCase):
+class SmsHandlerBaseTestMixin:
     HANDLER_NAME = None
 
     def setUp(self):
-        super(SmsHandlerBaseTestCase, self).setUp()
+        super(SmsHandlerBaseTestMixin, self).setUp()
 
         self.handler = get_handler(self.HANDLER_NAME)
         self.response = mock.Mock()
 
-    @mock.patch('requests.post', return_value=mock.Mock())
-    def test_makes_post_request_with_data(self, post_mock):
-        data = {'test_key': 'test_value'}
-        self.handler.send(data)
+    def test_makes_post_request_with_data(self):
+        response = mock.Mock()
+        response.json.return_value = {'status': 'ok', 'phone': 'any phone'}
 
-        post_mock.assert_called_with(self.handler.get_url(), data=data)
+        with mock.patch('requests.post', return_value=response) as post_mock:
+            data = {'test_key': 'test_value'}
+            self.handler.send(data)
+
+            post_mock.assert_called_with(self.handler.get_url(), data=data)
 
     def test_calls_success_log_on_success(self):
         response = mock.Mock()
@@ -47,10 +52,51 @@ class SmsHandlerBaseTestCase(TransactionTestCase):
                 self.handler.send({})
                 log_error.assert_called()
 
+    def test_success_log_creates_logs(self):
+        url = 'test url'
+        data = {'test_key': 'test_value'}
+        response = mock.Mock()
+        response.json.return_value = {'phone': 'any phone'}
 
-class SmsCenterTestCase(SmsHandlerBaseTestCase):
+        self.handler.log_success(url, data, response)
+        self.assertTrue(RequestLog.objects.filter(
+            url=url, request_data=data, phone='any phone',
+        ).exists())
+
+    def test_fail_log_creates_logs(self):
+        url = 'test url'
+        data = {'test_key': 'test_value'}
+        response = mock.Mock()
+        response.json.return_value = {
+            'phone': 'any phone',
+            'error_code': -3500,
+            'error_msg': 'Невозможно отправить сообщение указанному абоненту',
+        }
+
+        self.handler.log_fail(url, data, response)
+        self.assertTrue(RequestLog.objects.filter(
+            url=url, request_data=data, phone='any phone',
+        ).exists())
+        self.assertTrue(RequestLogError.objects.filter(
+            code=-3500, message='Невозможно отправить сообщение указанному абоненту',
+        ).exists())
+
+    def test_error_log_creates_logs(self):
+        url = 'test url'
+        data = {'test_key': 'test_value'}
+
+        self.handler.log_error(url, data)
+        self.assertTrue(RequestLog.objects.filter(
+            url=url, request_data=data,
+        ).exists())
+        self.assertTrue(RequestLogError.objects.filter(
+            message='Response parsing error',
+        ).exists())
+
+
+class SmsCenterTestCase(SmsHandlerBaseTestMixin, TransactionTestCase):
     HANDLER_NAME = 'SmsCenterHandler'
 
 
-class SmsTrafficTestCase(SmsHandlerBaseTestCase):
+class SmsTrafficTestCase(SmsHandlerBaseTestMixin, TransactionTestCase):
     HANDLER_NAME = 'SmsTrafficHandler'

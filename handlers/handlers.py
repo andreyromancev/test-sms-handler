@@ -1,4 +1,5 @@
 from .base import SmsHandlerAbstract
+from .registry import get_handler
 
 
 class SmsCenterHandler(SmsHandlerAbstract):
