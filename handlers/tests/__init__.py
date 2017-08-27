@@ -1,1 +1,1 @@
-from .test_registry import *
+from .test_handlers import *
