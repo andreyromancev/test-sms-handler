@@ -1,5 +1,4 @@
 from .base import SmsHandlerAbstract
-from .registry import get_handler
 
 
 class SmsCenterHandler(SmsHandlerAbstract):
@@ -7,7 +6,6 @@ class SmsCenterHandler(SmsHandlerAbstract):
 
     def get_url(self, *args, **kwargs):
         return self.BASE_URL
-
 
 
 class SmsTrafficHandler(SmsHandlerAbstract):
