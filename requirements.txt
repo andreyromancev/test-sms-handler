@@ -1,0 +1,9 @@
+# core
+Django==1.11.0
+
+# db
+psycopg2==2.7.1
+dj-database-url==0.4.2
+
+# env
+ipython==6.0
